@@ -1,0 +1,5 @@
+apexomni
+web3
+ecdsa
+mpmath
+sympy<1.9

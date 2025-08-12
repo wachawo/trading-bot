@@ -3,3 +3,5 @@ web3
 ecdsa
 mpmath
 sympy<1.9
+python-dotenv
+python-dateutil

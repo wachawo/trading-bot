@@ -1,6 +1,7 @@
 import os
 import requests
 import pandas as pd
+import time
 
 def call_coingecko_api(tokens): 
     """
@@ -45,6 +46,7 @@ def call_coingecko_api(tokens):
         headers = { "x-cg-demo-api-key": api_key }
         parameters = { "vs_currency": "usd", "days": "60", "interval": "daily" }    
         
+        time.sleep(2) # Delay to respect API rate limits (30 calls per minute)
         response = requests.get(url, headers=headers, params=parameters)
         
         if response.status_code == 200:
@@ -53,6 +55,7 @@ def call_coingecko_api(tokens):
                 "symbol": token_symbol,
                 "market_data": response.json()
             }
+            print(f"Successfully fetched market data for {token_name} ({token_symbol})")
         else:
             print(f"Response status code: {response.status_code}")
 

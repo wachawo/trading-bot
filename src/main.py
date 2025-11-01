@@ -1,3 +1,4 @@
+#%%
 # Setup paths and environment
 import sys
 from pathlib import Path

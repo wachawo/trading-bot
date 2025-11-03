@@ -92,32 +92,52 @@ class MarketDataHourlyLoad:
         except sqlite3.Error as e:
             print(f"Database error: {e}")
 
-    def update_historical_data(self):
-        """Clears and repopulates the database with historical data."""
-        print("--- [Hourly Job] Starting full refresh of historical data ---")
+    def get_last_timestamp(self, token_id):
+        """Gets the last timestamp for a token from the database."""
         try:
             with sqlite3.connect(self.db_file) as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM prices")
-                print("Cleared old data from the prices table.")
+                cursor.execute("SELECT MAX(timestamp) FROM prices WHERE token_id = ?", (token_id,))
+                result = cursor.fetchone()[0]
+                return result if result else 0
+        except sqlite3.Error as e:
+            print(f"Database error fetching last timestamp for {token_id}: {e}")
+            return 0
 
-                api_key = os.getenv("COINGECKO_API_KEY_ACCOUNT1")
+    def update_historical_data(self):
+        """Fetches and inserts new historical data since the last update."""
+        print("--- [Hourly Job] Starting incremental refresh of historical data ---")
+        try:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                api_key = os.getenv("COINGECKO_API_KEY_ACCOUNT")
                 if not api_key:
                     raise ValueError("COINGECKO API key not found.")
                 headers = {"x-cg-demo-api-key": api_key}
 
                 for token_id, token_info in self.tokens_to_watch.items():
+                    last_timestamp = self.get_last_timestamp(token_id)
+                    
+                    # Calculate days since last update
+                    if last_timestamp > 0:
+                        days_to_fetch = (datetime.utcnow() - datetime.utcfromtimestamp(last_timestamp)).days
+                        if days_to_fetch <= 0:
+                            print(f"Data for {token_id} is already up to date.")
+                            continue
+                    else:
+                        days_to_fetch = 59  # Initial load
+
                     self.rate_limiter.wait()
-                    print(f"Fetching historical data for {token_id}...")
+                    print(f"Fetching {days_to_fetch} day(s) of historical data for {token_id}...")
                     url = f"https://api.coingecko.com/api/v3/coins/{token_id}/market_chart"
-                    params = {"vs_currency": "usd", "days": "59", "interval": "daily"}
+                    params = {"vs_currency": "usd", "days": str(days_to_fetch), "interval": "daily"}
                     
                     response = requests.get(url, headers=headers, params=params)
                     if response.status_code == 200:
                         prices = response.json().get("prices", [])
-                        today_utc = datetime.utcnow().date()
                         
-                        historical_prices = [p for p in prices if datetime.utcfromtimestamp(p[0] / 1000).date() < today_utc]
+                        # Filter out the last known price to avoid duplicates
+                        historical_prices = [p for p in prices if int(p[0] / 1000) > last_timestamp]
                         
                         prices_to_insert = [
                             (token_id, token_info['name'], token_info['symbol'], int(p[0] / 1000), 
@@ -126,7 +146,7 @@ class MarketDataHourlyLoad:
                         ]
                         if prices_to_insert:
                             cursor.executemany("INSERT OR IGNORE INTO prices VALUES (?, ?, ?, ?, ?, ?)", prices_to_insert)
-                            print(f"Inserted {len(prices_to_insert)} historical price points for {token_id}.")
+                            print(f"Inserted {len(prices_to_insert)} new historical price points for {token_id}.")
                     else:
                         print(f"Failed to fetch API data for {token_id}. Status: {response.status_code}")
                 conn.commit()
@@ -141,7 +161,7 @@ class MarketDataHourlyLoad:
             token_ids = ",".join(self.tokens_to_watch.keys())
             url = "https://api.coingecko.com/api/v3/simple/price"
             params = {"ids": token_ids, "vs_currencies": "usd"}
-            api_key = os.getenv("COINGECKO_API_KEY_ACCOUNT1")
+            api_key = os.getenv("COINGECKO_API_KEY_ACCOUNT")
             headers = {"x-cg-demo-api-key": api_key}
             
             self.rate_limiter.wait()

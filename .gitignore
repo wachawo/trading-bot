@@ -8,4 +8,4 @@ __pycache__/
 .vscode/
 
 # Database
-market_data.db
+data/

@@ -63,7 +63,7 @@ class MarketDataHourlyLoad:
         """Initializes the market data load process."""
         print("Initializing the market data load process...")
         self.tokens_to_watch = tokens
-        self.db_file = Path(__file__).parent.parent / 'market_data.db'
+        self.db_file = Path(__file__).parent.parent / 'data' / 'market_data.db'
         self.rate_limiter = APIRateLimiter(max_calls=25, period_seconds=60)
         self.load_dotenv()
         self.init_db()

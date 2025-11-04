@@ -13,3 +13,4 @@ A agent/bot to monitor the crypto market, send alerts when a token is oversold (
 - [ ] Add docker and docker-compose files.
 - [ ] Integrate with a cryptocurrency exchange API to place trade orders.
 - [ ] Create a log file
+- [ ] Send the chart togehter with the alert
